@@ -1,5 +1,5 @@
 #########################################################
-# Passwords Database v1.0                               #
+# Passwords Database v1.1                               #
 # Written by: Matheus J. Castro                         #
 # Under MIT License                                     #
 # More information on:                                  #
@@ -15,6 +15,9 @@ import numpy as np
 import time
 import sys
 import os
+
+
+version = 1.1
 
 
 def import_csv(fl_name):
@@ -53,10 +56,9 @@ def remove_empty_pswd(data, noask=False):
     if not noask:
         no_pswd = np.where(pd.isnull(data["password"]))[0]
         answer = input("{} empty passwords entries were found:".format(len(no_pswd)) + "\n"
-                                                                                       "Rows = {}".format(
-            no_pswd + 1) + "\n"
-                           "Do you wanna to remove it?" + "\n"
-                                                          "[Y/n]: ")
+                       "Rows = {}".format(no_pswd + 1) + "\n"
+                       "Do you wanna to remove it?" + "\n"
+                       "[Y/n]: ")
         if answer == "n":
             print("Not removing it.")
             return data
@@ -72,9 +74,9 @@ def remove_duplicated(data, noask=False):
     if not noask:
         dup = np.where(data[["name", "username", "password"]].duplicated() == True)[0]
         answer = input("{} duplicated entries were found:".format(len(dup)) + "\n"
-                                                                              "Rows = {}".format(dup + 1) + "\n"
-                                                                                                            "Do you wanna to remove it?" + "\n"
-                                                                                                                                           "[Y/n]: ")
+                       "Rows = {}".format(dup + 1) + "\n"
+                       "Do you wanna to remove it?" + "\n"
+                       "[Y/n]: ")
         if answer == "n":
             print("Not removing it.")
             return data
@@ -122,19 +124,23 @@ def add_new_entry(data, noask=False):
 def open_database(fl_name, pswd=None):
     pswd_verify = ""
     if not os.path.isfile(fl_name):
-        while pswd != pswd_verify:
-            pswd = getpass("Type the new database password (empty for no password): ")
-            pswd_verify = getpass("Type the new password again: ")
-            print("Passwords doesn't match.") if pswd != pswd_verify else None
         conn = sqlcipher.connect(fl_name)
-        conn.execute("PRAGMA KEY='{}'".format(pswd))
+        if pswd != "None":
+            if pswd is None:
+                while pswd != pswd_verify:
+                    pswd = getpass("Type the new database password (empty for no password): ")
+                    pswd_verify = getpass("Type the new password again: ")
+                    print("Passwords doesn't match.") if pswd != pswd_verify else None
+            conn.execute("PRAGMA KEY='{}'".format(pswd))
     else:
         count = 0
         while True:
-            if pswd is None:
-                pswd = getpass("Type the database password: ")
             conn = sqlcipher.connect(fl_name)
-            conn.execute("PRAGMA KEY='{}'".format(pswd))
+            if pswd != "None":
+                if pswd is None:
+                    pswd = getpass("Type the database password: ")
+                conn.execute("PRAGMA KEY='{}'".format(pswd))
+
             try:
                 pd.read_sql_query("SELECT * from passwords", conn)
             except pandas.io.sql.DatabaseError:
@@ -143,6 +149,7 @@ def open_database(fl_name, pswd=None):
                 pswd = None
             else:
                 break
+
             if count >= 3:
                 sys.exit("\033[31mThree failed attempts. Exiting.\033[m")
     # dataBase.execute("CREATE TABLE IF NOT EXISTS passwords \
@@ -196,68 +203,81 @@ def write_database(data, conn):
 
 
 def arg_resolution(args):
-    csv_name = ""
-    db_name = ""
-    noask = False
-    deff = False
+    op = {"csv_name": None,
+          "db_name": None,
+          "pswd": None,
+          "noask": False,
+          "csvdatabase": False,
+          "databasecsv": False,
+          "encrypt": False,
+          "decrypt": False}
 
     if any(i == "-h" or i == "--help" for i in args):
         help_show()
     if any(i == "-v" or i == "--version" for i in args):
-        sys.exit("Passwords Database v1.0")
+        sys.exit("Passwords Database v{}".format(version))
     if any(i == "--csv" for i in args):
         ind = np.where(args == "--csv")[0][0]
-        csv_name = args[ind + 1]
+        op["csv_name"] = args[ind + 1]
     if any(i == "--db" for i in args):
         ind = np.where(args == "--db")[0][0]
-        db_name = args[ind + 1]
+        op["db_name"] = args[ind + 1]
     if any(i == "--no-ask" for i in args):
-        noask = True
-    if any(i == "--default" for i in args):
-        deff = True
+        op["noask"] = True
+    if any(i == "--csv-to-database" for i in args):
+        op["csvdatabase"] = True
+    elif any(i == "--database-to-csv" for i in args):
+        op["databasecsv"] = True
     if any(i == "--encrypt" for i in args):
-        deff = True
-    if any(i == "--decrypt" for i in args):
-        deff = True
+        op["encrypt"] = True
+    elif any(i == "--decrypt" for i in args):
+        op["decrypt"] = True
     if any(i == "-p" for i in args):
         ind = np.where(args == "-p")[0][0]
-        pswd = args[ind + 1]
+        op["pswd"] = args[ind + 1]
 
-    return csv_name, db_name, noask
+    return op
 
 
 def help_show():
-    sys.exit("\tPasswords Database v1.0\n"
+    sys.exit("\t\033[1;3;31mHelp Section\033[m\n"
+             "\tPasswords Database v{}\n".format(version) +
              "\tWritten by: Matheus J. Castro\n"
              "\tUnder MIT License\n"
              "\tMore information on: https://github.com/MatheusJCastro/PasswordsDatabase\n\n"
              "Usage: python3 pswd.py [options]\n"
-             "No options will open the interactive menu\n\n"
-             "Options are:"
-             "-h, --help\t|\tShow this help\n"
-             "-v, --version\t|\tShow the version\n"
-             "--csv [argument]|\tDefine CSV file name\n"
-             "--db  [argument]|\tDefine SQLite3 Database name\n"
-             "--no-ask\t|\tNo ask wil be prompted\n"
-             "--default\t|\tDefault read CSV and write Database\n"
-             "\t\t|\tThis includes the remove black passwords,\n"
-             "\t\t|\tremove duplicated entries, sort Database by name,\n"
-             "\t\t|\tand write it into a SQLite3 Database")
+             "\033[1;30;47mNo options will open the interactive menu\033[m\n\n"
+             "Options are:\n"
+             "-h, --help\t |\tShow this help\n"
+             "\033[30;47m-v, --version\033[m\t |\t\033[30;47mShow the version\033[m\n"
+             "--csv [argument] |\tDefine CSV file name\n"
+             "\033[30;47m--db  [argument]\033[m |\t\033[30;47mDefine SQLite3 Database name\033[m\n"
+             "--no-ask\t |\tNo ask wil be prompted\n"
+             "\033[30;47m--csv-to-database\033[m|\t\033[30;47mDefault read CSV and write SQLite3 Database\033[m\n"
+             "\t\t |\t\033[30;47mThis includes the remove blank passwords,\033[m\n"
+             "\t\t |\t\033[30;47mremove duplicated entries, sort Database by name,\033[m\n"
+             "\t\t |\t\033[30;47mand write it into a SQLite3 Database\033[m\n"
+             "--database-to-csv|\tSame as \033[3m--csv-to-database\033[m but reads SQLite3\n"
+             "\t\t |\tDatabase and write a CSV file\n"
+             "\033[30;47m--encrypt\033[m\t |\t\033[30;47mEncrypt SQLite3 Database\033[m\n"
+             "--decrypt\t |\tDecrypt SQLite3 Database\n"
+             "\033[30;47m-p [argument]\033[m\t |\t\033[30;47mSet encryption password. "
+             "\033[1;3mNone\033[0;30;47m for no password.\033[m")
 
 
 def interactive_menu():
     def clear_print():
-        menu = "\tPasswords Database v1.0\n" \
+        menu = "\tPasswords Database v{}\n".format(version) + \
                "\tWritten by: Matheus J. Castro\n" \
                "\tUnder MIT License\n" \
                "\tMore information on: https://github.com/MatheusJCastro/PasswordsDatabase\n\n" \
                "What to do?\n" \
                " 1- Read CSV password file\n" \
-               " 2- Export Databse to a CSV file\n" \
+               " 2- Export Database to a CSV file\n" \
                " 3- Remove empty passwords os DataFrame\n" \
                " 4- Remove duplicated entries on DataFrame\n" \
                " 5- Resort DataFrame by name\n" \
-               " 6- Add new entrie to DataFrame\n" \
+               " 6- Add new entry to DataFrame\n" \
                " 7- Open/Create SQLite3 Database\n" \
                " 8- Write to a Database\n" \
                " 9- Read from a Database\n" \
@@ -265,7 +285,8 @@ def interactive_menu():
                "11- Decrypt Database\n" \
                "12- View loaded DataFrame\n" \
                "13- Default Read CSV then write to a Database\n" \
-               "14- Exit\n"
+               "14- Default Read Database then write to a CSV\n" \
+               "15- Exit\n"
 
         os.system('cls' if os.name == 'nt' else 'clear')
         print(menu)
@@ -273,7 +294,7 @@ def interactive_menu():
     clear_print()
 
     data = dataBase = db_name = op = None
-    while op != 14:
+    while op != 15:
         try:
             op = int(input("Type the number option: "))
         except ValueError:
@@ -332,6 +353,22 @@ def interactive_menu():
             data = remove_duplicated(data, noask=True)
             data = sort_dataFrame(data, noask=True)
             write_database(data, dataBase)
+        elif op == 14:
+            clear_print()
+
+            db_name = input("SQLite3 Database name: ")
+            if not os.path.isfile(db_name):
+                sys.exit("File \033[1;3;31m{}\033[m not found.".format(db_name))
+            else:
+                dataBase = open_database(db_name)
+
+                data = read_database(dataBase)
+                data = remove_empty_pswd(data, noask=True)
+                data = remove_duplicated(data, noask=True)
+                data = sort_dataFrame(data, noask=True)
+
+                csv_name = input("CSV file name: ")
+                export_csv(data, csv_name)
         else:
             clear_print()
             print("\033[31mInvalid option.\033[m")
@@ -343,7 +380,38 @@ def main(args):
     if len(args) == 0:
         interactive_menu()
     else:
-        csv_name, db_name, noask = arg_resolution(args)
+        op = arg_resolution(args)
+
+        if op["db_name"] is None:
+            op["db_name"] = input("SQLite3 Database name: ")
+        dataBase = open_database(op["db_name"], pswd=op["pswd"])
+
+        if op["csvdatabase"]:
+            if op["csv_name"] is None:
+                op["csv_name"] = input("CSV file name: ")
+            data = import_csv(op["csv_name"])
+
+            data = remove_empty_pswd(data, noask=op["noask"])
+            data = remove_duplicated(data, noask=op["noask"])
+            data = sort_dataFrame(data, noask=op["noask"])
+            write_database(data, dataBase)
+
+        elif op["databasecsv"]:
+
+            data = read_database(dataBase)
+            data = remove_empty_pswd(data, noask=op["noask"])
+            data = remove_duplicated(data, noask=op["noask"])
+            data = sort_dataFrame(data, noask=op["noask"])
+
+            if op["csv_name"] is None:
+                op["csv_name"] = input("CSV file name: ")
+            export_csv(data, op["csv_name"])
+
+        elif op["encrypt"]:
+            add_encryption(dataBase, op["db_name"])
+
+        elif op["decrypt"]:
+            remove_encryption(dataBase, op["db_name"])
 
 
 if __name__ == '__main__':
