@@ -1,3 +1,12 @@
+#########################################################
+# Passwords Database v1.0                               #
+# Written by: Matheus J. Castro                         #
+# Under MIT License                                     #
+# More information on:                                  #
+# https://github.com/MatheusJCastro/PasswordsDatabase   #
+#########################################################
+
+
 from pysqlcipher3 import dbapi2 as sqlcipher
 from getpass import getpass
 import pandas.io.sql
